@@ -40,10 +40,20 @@ public class EntranceWorker extends Thread
     /* Method to process the command data and enqueue it into the list, so 
      * that they can be handled by the selector thread (the waiting room thread). 
      */
-    public void processData (ChatServerDB serverThrd, SocketChannel soc, byte data[])
+    public void processData (ChatServerDB serverThrd, SocketChannel soc, byte data[], int count)
     {
+        // Local Variable Declaration 
+        byte[] filteredReadBuff = null;
+        
+        // Instansiate the sub buffer array with the amount of bytes read
+        filteredReadBuff = new byte[count];
+
+        /* Get the subset of the read buffer that represents the data just read, 
+         * filtering out data in the buffer from prior reads */
+         System.arraycopy(data, 0, filteredReadBuff, 0, count);
+         
         // Deserialize the data array passed converting into a map, 'associative array'
-        Map <String, String> postData = DataSerializer.deserializeData(data);
+        Map <String, String> postData = DataSerializer.deserializeData(filteredReadBuff);
 
         /* Create sychronized lock over the queue so that it can't be changed 
          * while a new waitRoomEvent is being added */

@@ -33,25 +33,25 @@ public class EchoWorker implements Runnable
     /* Method to process the message data and enqueue it into the list, so 
      * that they can be handled by the selector thread (the main thread), 
      * where it will be written back to user. */
-    public void processData (ChatThread ct, SocketChannel sc,  
-                             byte[] data, int count)
+    public void processData (ChatThread ct, SocketChannel sc, byte[] data, int count)
     {
         /* Create a byte array to hold message data.*/
-        byte[] dataCopy = new byte[count];
+        byte[] filteredReadData = new byte[count];
 
         /* Copy the original data payload into another array, only copying the 
          * bytes that were just read into the buffer */
-        System.arraycopy(data, 0, dataCopy, 0, count);
+        System.arraycopy(data, 0, filteredReadData, 0, count);
         
         // Deserialize the data array passed converting into a map, 'associative array'
-        Map <String, String> postData = DataSerializer.deserializeData(dataCopy);
+        Map <String, String> postData = DataSerializer.deserializeData(filteredReadData);
         
         // Create sychronized lock
         synchronized (queue)
         {
             // Add a new ChatDataEvent to the queue 
-            queue.add(new ChatDataEvent (
-                ct, sc, postData.get(MSG), dataCopy
+            queue.add(new ChatDataEvent 
+            (
+                ct, sc, postData.get(MSG), filteredReadData
             ));
 
             // Notify the queue that there are new events 

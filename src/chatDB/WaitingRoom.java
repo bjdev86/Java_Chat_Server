@@ -215,6 +215,10 @@ public class WaitingRoom implements Runnable
             // Remove the client from the chat thread 
             chatThread.removeContact(sc);
             
+            /* Send a message to the other members of the chat thread that a user 
+             * has left */
+            chatThread.multiplex(null, ("Member left: " + sc.toString()).getBytes());
+            
             // Build a response string 
             rsp = DataSerializer.ERRORED + "=false";
             
@@ -237,17 +241,14 @@ public class WaitingRoom implements Runnable
     
     /**
      * 
-     * @param chatName
+     * 
      * @param sc 
      */
-    public void logOff (String chatName, SocketChannel sc)
+    public void logOff (SocketChannel sc)
     {
         // Local Variable Declaration 
         String rsp = ""; 
-        
-        // Leave the chat thread 
-        //this.leaveChatThread(chatName, sc);       
-        
+                
         // Log the time the client was signed off
         System.out.println("Client Logged-off: " + sc.toString());
         

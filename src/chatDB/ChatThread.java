@@ -232,9 +232,9 @@ public class ChatThread implements Runnable
                      * sender, but to all others connected. */
                     if (keyChan != sc)
                     {
-                          /* Add the data that is to be sent back to the client 
-                           * to the queue. ArrayList passed by reference. */
-                          queue.add(ByteBuffer.wrap(data));
+                        /* Add the data that is to be sent back to the client 
+                         * to the queue. ArrayList passed by reference. */
+                        queue.add(ByteBuffer.wrap(data));
                     }
                });
             }
@@ -405,11 +405,15 @@ public class ChatThread implements Runnable
                                /* Get the key from the socSelector for the 
                                 * channel represented in the change request */
                                SelectionKey key = change.getSocketChannel().keyFor(this.chatSelector);
-
+                               
                                /* Change the intereste op for the key, which 
                                 * is still attached to the selector, to the op 
-                                * that is specified by the ChangeRequest */
-                               key.interestOps( change.getOps() );
+                                * that is specified by the ChangeRequest. Only
+                                * change the interest op if the key isn't null.*/
+                               if (key != null)
+                               {
+                                   key.interestOps( change.getOps() );
+                               }
                            }// EndCase
                        }// EndSwitch
                    } // End While loop

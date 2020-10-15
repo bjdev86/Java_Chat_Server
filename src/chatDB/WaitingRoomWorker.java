@@ -149,7 +149,7 @@ public class WaitingRoomWorker extends Thread
             }
             case SIGN_OFF:
             {
-                selThread.logOff(vars.get(CHAT_NAME), socket);
+                selThread.logOff(socket);
                 
                 break;
             }

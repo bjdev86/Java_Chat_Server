@@ -58,7 +58,7 @@ public class ChatServerDB implements Runnable
      * readiness. */
     public ChatServerDB (String hostAddress, int port) throws IOException
     {
-        this.users.put("admin", "password"); //TEST
+        this.users.put("admin", "password"); //TEST USERS
         // Set the host and port from the parameters passed 
         this.hostAddress = new InetSocketAddress(hostAddress, port);
 
@@ -72,7 +72,6 @@ public class ChatServerDB implements Runnable
     {
         // Local Variable Declaration 
         String dataString = "", dbPssWrd = ""; 
-        Object sendLock = new Object();
         
         // Get the user name and password from the database (USE BUILT-IN Object for now)
         dbPssWrd = this.users.get(usrName);
@@ -278,7 +277,7 @@ public class ChatServerDB implements Runnable
            else
            {
                 // Hand off the data to a worker thread for processing
-                this.doorman.processData(this, sc, this.readBuffer.array());
+                this.doorman.processData(this, sc, this.readBuffer.array(), bytesRead);
            }
        }
    } 
@@ -419,7 +418,8 @@ public class ChatServerDB implements Runnable
                 
                 /* Halt execution while the socket selector polls serversocket 
                  * channel for connection events. Essetinally execution will 
-                 * block here for connections */
+                 * block here for connections, read readiness and write 
+                 * readiness */
                 this.socSelector.select();
 
                 /* Get an iterator over the selected keys from the socSelector, 
@@ -473,7 +473,7 @@ public class ChatServerDB implements Runnable
         try 
         {
             // Start the server as new thread listening at localhost:90
-            new Thread (new ChatServerDB("localhost", 90), "Server").start();
+            new Thread (new ChatServerDB("localhost", 90), "ChatServer").start();
         }
 
         catch (IOException ioe)
