@@ -6,17 +6,15 @@
 package chatDB;
 
 import java.nio.channels.SocketChannel;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  *
  * @author Ben
  */
-public class EntranceWorker extends Thread 
+public class ReceptionWorker extends Thread 
 {
 /*---------------------------- PRIVATE DATA MEMBERS --------------------------*/
     // Private delimitor constants for parsing data strings
@@ -34,13 +32,13 @@ public class EntranceWorker extends Thread
     private final String LNAME  = DataSerializer.LNAME;
     
     // Queue of WaitRoomEvents to process 
-    private List<EntranceEvent> queue = new LinkedList<>();
+    private List<ReceptionEvent> queue = new LinkedList<>();
 /*----------------------------------------------------------------------------*/
     
     /* Method to process the command data and enqueue it into the list, so 
      * that they can be handled by the selector thread (the waiting room thread). 
      */
-    public void processData (ChatServerDB serverThrd, SocketChannel soc, byte data[], int count)
+    public void processData (RecptionRoom serverThrd, SocketChannel soc, byte data[], int count)
     {
         // Local Variable Declaration 
         byte[] filteredReadBuff = null;
@@ -60,7 +58,7 @@ public class EntranceWorker extends Thread
         synchronized (queue)
         {
             // Add a new ChatDataEvent to the queue 
-            queue.add(new EntranceEvent
+            queue.add(new ReceptionEvent
             (
                 serverThrd, soc, 
                 ((postData.get(CMD)).trim()), 
@@ -82,7 +80,7 @@ public class EntranceWorker extends Thread
     public void run() 
     {
         // Local Variable Declaration 
-        EntranceEvent entEvent; 
+        ReceptionEvent entEvent; 
 
         /* Start event loop taht will continually try to process worker 
          * events */
@@ -106,7 +104,7 @@ public class EntranceWorker extends Thread
                 }
 
                 // Pop off the last WaitRoomEvent from the event queue
-                entEvent = (EntranceEvent) queue.remove(0);
+                entEvent = (ReceptionEvent) queue.remove(0);
             }
 
             /* Send the command back to the command parser to be executed in the 
@@ -116,7 +114,7 @@ public class EntranceWorker extends Thread
         }
     }    
     
-    private void executeCommand(ChatServerDB server, SocketChannel socket, 
+    private void executeCommand(RecptionRoom server, SocketChannel socket, 
                                 String command, Map<String, String> params) 
     {
         // Switch the command byte flag
@@ -141,6 +139,7 @@ public class EntranceWorker extends Thread
             default:
             {
                 // Unsported command exception 
+                server.unsupportedCmd(socket, command);
                 
                 break;
             }

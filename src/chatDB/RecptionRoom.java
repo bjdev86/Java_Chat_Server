@@ -1,3 +1,7 @@
+/**
+ * Date Created : 9/28/2020
+ * 
+ */
 package chatDB;
 
 import java.io.IOException;
@@ -13,10 +17,38 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
-public class ChatServerDB implements Runnable
+/**
+ * Class to define a selector thread that acts as front door for this chat server.
+ * The class defines a <code>ServerSocketChannel</code>, puts it in the thread's 
+ * <code>Selector</code> and starts its event loop. The event loop checks for 
+ * new incoming socket connections. (Along with checking for read and write 
+ * readiness). When a new connection is made that connection is also placed in
+ * the <code>Selector</code>. The server will continue to read bytes from the client.
+ * After deserializing the byte strings from the client the server will execute
+ * the command that client sent. The data sent along with the command will be used
+ * to execute the command. 
+ * <br><br>
+ * The commands that this server can execute are "LOG_IN" and "SGN_UP". The 
+ * LOG_IN command takes user name and password arguments, and validates them 
+ * against the user name and password in the database. The connection is moved
+ * into the <code>WaitingRoom</code> selector thread if the credentials are 
+ * valid, and an error message is sent back to the client if the credentials are
+ * not valid. An <code>ReceptionWorker</code> thread is used to handle this 
+ * validation job. 
+ * <br><br>
+ * The SGN_UP command takes the client's data and uses it to register the client
+ * in the database. The client will provide a user name and password along with
+ * any other important details about the client. Once the registered, the client 
+ * connection will be wait in this selector thread until a command to "log-in" 
+ * is issued or the client disconnects from this server. Any errors in the
+ * registration process will be sent back to the client with an error message.
+ * 
+ * @author Ben
+ * @version 1.0
+ * 
+ */
+public class RecptionRoom implements Runnable
 {
 //------------------------- PRIVATE DATA MEMBERS -------------------------------
     // Private Data Constansts 
@@ -46,17 +78,25 @@ public class ChatServerDB implements Runnable
      * conversation */
     private WaitingRoom waitingRoom = null;
     
-    /* Authentication worker thread to handle client credential authentication 
+    /* ReceptionWorker thread to handle client credential authentication 
      * (ie login events) */
-    private EntranceWorker doorman = null;
+    private ReceptionWorker doorman = null;
     
+    // TEMPORIALY USED FOR TESTING!!!!
      private Map <String, String> users = new HashMap<>();
     //--------------------------------------------------------------------------
 
-    /* Public constructor to setup this server's connection componets and 
+    /**
+     *Public constructor to setup this server's connection components and 
      * initialize the selector that will be used to detect socket channel 
-     * readiness. */
-    public ChatServerDB (String hostAddress, int port) throws IOException
+     * readiness.
+     * 
+     * @param hostAddress
+     * @param port
+     * @throws IOException
+     */
+
+    public RecptionRoom (String hostAddress, int port) throws IOException
     {
         this.users.put("admin", "password"); //TEST USERS
         // Set the host and port from the parameters passed 
@@ -66,8 +106,15 @@ public class ChatServerDB implements Runnable
         this.socSelector = this.initSelector();
     }
     
+
     /* Method to log a user in. 
      * @TODO Add start session when a login successfully occurs.*/
+    /**
+     *
+     * @param sc
+     * @param usrName
+     * @param pssWrd
+     */
     public void login (SocketChannel sc, String usrName, String pssWrd)
     {
         // Local Variable Declaration 
@@ -117,6 +164,16 @@ public class ChatServerDB implements Runnable
     }
     
     /* Method to register a new user */
+
+    /**
+     *
+     * @param sc
+     * @param usrName
+     * @param pssWrd
+     * @param fName
+     * @param lName
+     */
+
     public void register (SocketChannel sc, String usrName, String pssWrd,
                                                      String fName, String lName)
     {
@@ -135,6 +192,12 @@ public class ChatServerDB implements Runnable
     
     /* Method to remove a socket channel from the selector used by this 
      * SelectorThread */
+
+    /**
+     *
+     * @param sc
+     */
+
     public void removeClient (SocketChannel sc)
     {
         sc.keyFor(this.socSelector).cancel();
@@ -192,6 +255,26 @@ public class ChatServerDB implements Runnable
         //this.socSelector.wakeup();
     }
 
+    /**
+     * 
+     * @param socket
+     * @param command 
+     */
+    public void unsupportedCmd(SocketChannel socket, String command) 
+    {
+        // Local Variable Declaration 
+        String rsp = "";
+        
+        // Build response 
+        rsp = DataSerializer.ERRORED + DataSerializer.ENTRY_DELM + "true"
+            + DataSerializer.ERR_MSG + DataSerializer.ENTRY_DELM 
+            + "The command, " + command + " is not supported.";
+        
+        // Let the client know the command they issued is not supported 
+        this.send(socket, rsp.getBytes());
+    }
+    
+    /*------------------------------------------------------------------------*/
     /**
      * 
      * @param sc
@@ -352,7 +435,7 @@ public class ChatServerDB implements Runnable
         try
         {
             // Create an authenticator worker thread 
-            this.doorman = new EntranceWorker(); 
+            this.doorman = new ReceptionWorker(); 
             
             // Start the authenticator worker 
             new Thread (this.doorman, "EntranceWorker").start();
@@ -468,12 +551,16 @@ public class ChatServerDB implements Runnable
         }            
     }
     
+    /**
+     *
+     * @param args
+     */
     public static void main(String[] args) 
     {
         try 
         {
             // Start the server as new thread listening at localhost:90
-            new Thread (new ChatServerDB("localhost", 90), "ChatServer").start();
+            new Thread (new RecptionRoom("localhost", 90), "ChatServer").start();
         }
 
         catch (IOException ioe)

@@ -16,7 +16,7 @@ import java.util.Map;
  * 
  * @author Ben
  */
-public class EchoWorker implements Runnable 
+public class ChatWorker implements Runnable 
 {
 /*------------------------------ PRIATE MEMBER DECLARATION -------------------*/
     // Private Data Constants 
@@ -28,12 +28,12 @@ public class EchoWorker implements Runnable
 /*----------------------------------------------------------------------------*/
     
     // Constructor 
-    public EchoWorker(){}
+    public ChatWorker(){}
 
     /* Method to process the message data and enqueue it into the list, so 
      * that they can be handled by the selector thread (the main thread), 
      * where it will be written back to user. */
-    public void processData (ChatThread ct, SocketChannel sc, byte[] data, int count)
+    public void processData (ChatRoom ct, SocketChannel sc, byte[] data, int count)
     {
         /* Create a byte array to hold message data.*/
         byte[] filteredReadData = new byte[count];
@@ -99,7 +99,7 @@ public class EchoWorker implements Runnable
             if (dataEvent.getMessage() != null)
             {
                 /* Send the data back to the client by calling the multiplex method 
-                 * in the ChatThread class */
+                 * in the ChatRoom class */
                 dataEvent.getChatThread().multiplex
                 ( 
                     dataEvent.getSocket(), dataEvent.getMessage().getBytes() 

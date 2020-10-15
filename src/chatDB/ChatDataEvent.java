@@ -16,13 +16,13 @@ import java.nio.channels.SocketChannel;
 public class ChatDataEvent 
 {
     // Local Variable Declaration 
-    private ChatThread chatThread;
+    private ChatRoom chatThread;
     private SocketChannel socket;
     private String message;;
     private byte[] cmdString; 
 
     // Constructor
-    public ChatDataEvent(ChatThread ct, SocketChannel socket, String mssg, byte[] cmdString) 
+    public ChatDataEvent(ChatRoom ct, SocketChannel socket, String mssg, byte[] cmdString) 
     {
         this.chatThread = ct;
         this.socket = socket;
@@ -31,7 +31,7 @@ public class ChatDataEvent
     }
     
     // Getters
-    public ChatThread getChatThread ()
+    public ChatRoom getChatThread ()
     {
         return this.chatThread;
     }

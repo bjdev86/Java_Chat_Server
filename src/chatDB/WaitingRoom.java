@@ -22,8 +22,33 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- *
- * @author Ben
+ * Class to define a selector thread that acts as the waiting room for a client.
+ * From the waiting room and client can join a chat thread and create a chat 
+ * thread with other clients. The waiting room handles requests issued by clients
+ * who wish to leave a given chat thread. A client must return (or be returned)
+ * to the waiting room when they want to log-off this chat server. 
+ * <br><br>
+ * This selector thread gets <code>SocketChannel</code> connections handed to it
+ * by the <code>ReceptionRoom</code>, and then listens for commands to be send
+ * from the client over those <code>SocektChannel</code>s. 
+ * 
+ * In particular this selector thread can process and handle the following 
+ * commands:
+ * <ul>
+ *      <li>CRT_CHT</li>
+ *      <li>JOIN_CHT</li>
+ *      <li>LEAVE_CHT</li>
+ *      <li>SIGN_OFF</li>
+ * </ul>
+ * 
+ * The client connection will be handed off to a chat room when the join or create
+ * command is issued. 
+ * <br><br>
+ * This selector thread makes use of the <code>WaitingRooomWorker</code> worker
+ * thread to handle all commands issued to this selector thread 
+ * 
+ * @author Ben Miller
+ * @version 1.0
  */
 public class WaitingRoom implements Runnable 
 {
@@ -47,11 +72,11 @@ public class WaitingRoom implements Runnable
    // Authentication worker thread used to authenticate credentials concurrently
    private WaitingRoomWorker cmdExecutor = null;
    
-   // ChatThread used as the chat room for this chat server
-   private ChatThread chatThread = null;
+   // ChatRoom used as the chat room for this chat server
+   private ChatRoom chatThread = null;
    
    // Map to hold a list of all the ChatThreads by name 
-   private Map <String, ChatThread> chatThreads = new HashMap<>();
+   private Map <String, ChatRoom> chatThreads = new HashMap<>();
    
    private Map <String, String> users = new HashMap<>();
 /*----------------------------------------------------------------------------*/
@@ -66,7 +91,7 @@ public class WaitingRoom implements Runnable
    }
    
    /**
-    * Method to add a socket channel to the selector managed by this ChatThread 
+    * Method to add a socket channel to the selector managed by this ChatRoom 
     *
     * @param sc The socket channel to register on this thread's selector
     * 
@@ -104,14 +129,14 @@ public class WaitingRoom implements Runnable
      * back to the client. 
      * 
      * @param sc The socket channel over which the command to create the new 
-     *           ChatThread came. 
+           ChatRoom came. 
      * 
-     * @param chatName The name of the new ChatThread.
+     * @param chatName The name of the new ChatRoom.
      */
     public void createChatThread (SocketChannel sc, String chatName)
     {
         // Local Variable Declaration 
-        ChatThread newChat = null; 
+        ChatRoom newChat = null; 
         String rsp = ""; 
         
         try 
@@ -120,7 +145,7 @@ public class WaitingRoom implements Runnable
             if (!this.chatThreads.containsKey(chatName))
             {
                 // Spin up a new chat thread
-                newChat = new ChatThread(this, chatName);
+                newChat = new ChatRoom(this, chatName);
 
                 // Start it running 
                 new Thread(newChat, chatName + " Chat Thread").start();
@@ -158,7 +183,7 @@ public class WaitingRoom implements Runnable
     {        
         // Local Varaible Declaration 
         String rsp = "";
-        ChatThread chatThread; 
+        ChatRoom chatThread; 
         
         try 
         {
@@ -176,7 +201,7 @@ public class WaitingRoom implements Runnable
             // Build response string
             rsp = DataSerializer.ERRORED + "=" + "false";  
             
-            // Have the ChatThread send the response message back to the clinet 
+            // Have the ChatRoom send the response message back to the clinet 
             chatThread.send(sc, rsp.getBytes());
         } 
         catch (IOException ioe) 
@@ -202,7 +227,7 @@ public class WaitingRoom implements Runnable
     {
         // Local Variable Declaration 
         String rsp = "";
-        ChatThread chatThread; 
+        ChatRoom chatThread; 
         
         try 
         {

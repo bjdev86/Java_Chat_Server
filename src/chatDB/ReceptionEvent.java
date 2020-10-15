@@ -12,15 +12,15 @@ import java.util.Map;
  *
  * @author Ben
  */
-class EntranceEvent
+class ReceptionEvent
 {
     // Local Variable Declaration 
-    private ChatServerDB chatServer;
+    private RecptionRoom chatServer;
     private SocketChannel socket;
     private String command; 
     private Map <String, String> variables;
     
-    public EntranceEvent(ChatServerDB chatServer, SocketChannel sc, String command, 
+    public ReceptionEvent(RecptionRoom chatServer, SocketChannel sc, String command, 
                          Map<String, String> vars) 
     {
         this.chatServer = chatServer;
@@ -30,7 +30,7 @@ class EntranceEvent
     }
     
     // Getters 
-    public ChatServerDB getChatServer()
+    public RecptionRoom getChatServer()
     {
         return this.chatServer;
     }

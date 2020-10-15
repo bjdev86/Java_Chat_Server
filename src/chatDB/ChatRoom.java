@@ -1,7 +1,6 @@
 
 package chatDB;
 
-import com.sun.source.tree.Scope;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -15,12 +14,27 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Class to define a ChatThread. A chat thread is thread that facilitates   
- * the communication amongst users (socket channels).
+ * Class to define a selector thread that acts a chat room for two or more clients.
+ * This is the final stage in the chat server. Here clients send and receive
+ * messages from and to one another. This selector thread is responsible for 
+ * handling only message multiplexing, and chat thread logging. If a client 
+ * issues a command having to with the <code>WaitingRoom</code> selector thread
+ * then that command will be sent to the waiting room selector for handling. All
+ * message multiplex and logging are handled by the <code>ChatWorker</code> worker
+ * thread. 
+ * <br><br>
+ * Each <code>ChatRoom</code> will come with a handle to the waiting room 
+ * selector thread, so that a client still has access to <code>WaitingRoom</code> 
+ * functionality. To access the waiting room functionality, such as "LEAVE_CHT" 
+ * the client simply issues the corresponding command and the 
+ * <code>ChatWorker</code> will dispatch that command, along with the command's 
+ * dependant data, to the <code>WaitingRoomWorker</code> that is associated with 
+ * this <code>ChatRoom</code>.
  * 
- * @author Ben
+ * @author Ben Miller
+ * @version 1.0
  */
-public class ChatThread implements Runnable
+public class ChatRoom implements Runnable
 {
 //------------------------ PRIVATE DATA MEMBERS ----------------------------
    // Selector used to hold all the member socketchannels for this chat thread/room
@@ -30,7 +44,7 @@ public class ChatThread implements Runnable
    private ByteBuffer readBuffer = ByteBuffer.allocate(100); // DIRECT???
 
    // Multiplexor worker to multiplex socket channels together for chatting
-   private EchoWorker echoW = null;
+   private ChatWorker echoW = null;
 
    // Local handle to the waiting room thread from whence this chat was spawned
    private WaitingRoom waitingRoom = null; 
@@ -38,7 +52,7 @@ public class ChatThread implements Runnable
    // Local handle to the WaitingRoomWorker used to execute WaitingRoom commands
    private WaitingRoomWorker waitRoomWorker = null;
    
-   // The name of this ChatThread 
+   // The name of this ChatRoom 
    private String name = "";
    
    /* List of change requests used to flip the selector to select for 
@@ -57,19 +71,19 @@ public class ChatThread implements Runnable
      * 
      * @throws IOException
      */
-    public ChatThread (WaitingRoom wr, String name) throws IOException
+    public ChatRoom (WaitingRoom wr, String name) throws IOException
    {
        // Open up the selector 
        this.chatSelector = Selector.open();
        
-       // Set the waiting room selector thread, the creator of this ChatThread
+       // Set the waiting room selector thread, the creator of this ChatRoom
        this.waitingRoom = wr; 
        
        // Set the name 
        this.name = name;
    }
 
-   /* Method to add a socket channel to the selector managed by this ChatThread */
+   /* Method to add a socket channel to the selector managed by this ChatRoom */
    public void addContact (SocketChannel sc) throws IOException
    {
        // Make sure the socekt channel is non-blocking
@@ -358,8 +372,8 @@ public class ChatThread implements Runnable
    @Override
    public void run() 
    {
-       // Create a EchoWorker thread for the chat thread
-       this.echoW = new EchoWorker();
+       // Create a ChatWorker thread for the chat thread
+       this.echoW = new ChatWorker();
        
        // Start the thread
        new Thread(this.echoW, "EchoWorker").start();
