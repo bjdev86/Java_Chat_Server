@@ -267,8 +267,9 @@ public class RecptionRoom implements Runnable
         
         // Build response 
         rsp = DataSerializer.ERRORED + DataSerializer.ENTRY_DELM + "true"
-            + DataSerializer.ERR_MSG + DataSerializer.ENTRY_DELM 
-            + "The command, " + command + " is not supported.";
+            + DataSerializer.ENTRY_DELM + DataSerializer.ERR_MSG  
+            + DataSerializer.ENTRY_DELM + "The command, " + command 
+            + " is not supported.";
         
         // Let the client know the command they issued is not supported 
         this.send(socket, rsp.getBytes());

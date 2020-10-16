@@ -286,6 +286,21 @@ public class WaitingRoom implements Runnable
         // Mark the socket, client, for removal by adding it to the set
         this.clientsToRemove.add(sc.keyFor(this.waitSelector));
     }
+    
+    public void unSupportedCmd(SocketChannel sc, String command) 
+    {
+        // Local Variable Declaration 
+        String rsp = ""; 
+        
+        // Build response string 
+        rsp = DataSerializer.ERRORED + DataSerializer.KV_DELM + "true"
+            + DataSerializer.ENTRY_DELM + DataSerializer.ERR_MSG 
+            + DataSerializer.KV_DELM + "The command " + command 
+            + " issued is unsupported.";
+        
+        // Send response to the client
+        this.send(sc, rsp.getBytes());
+    }
 /******************************************************************************/    
     /**
      * 
@@ -554,5 +569,7 @@ public class WaitingRoom implements Runnable
             }
         }
     }    
+
+    
 
 }

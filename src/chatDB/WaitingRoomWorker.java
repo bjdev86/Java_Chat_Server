@@ -164,6 +164,8 @@ public class WaitingRoomWorker extends Thread
             }
             default:
             {
+                selThread.unSupportedCmd(socket, command);
+                
                 break; 
             }
         }
