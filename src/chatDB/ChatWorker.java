@@ -1,8 +1,4 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+
 package chatDB;
 
 import java.nio.channels.SocketChannel;
@@ -11,10 +7,24 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Worker thread to echo the message that was sent from a user back to the other 
- * users connected to this chat server. 
+ * Class to define a worker thread responsible for echoing messages received from
+ * one client out to all the clients involved in <code>ChatRoom</code> thread.
+ * This worker thread receive raw data along with the socket connection over 
+ * which the raw data came and created a <code>ChatDataEvent</code>. This thread
+ * is then interrupted and the <code>ChatDataEvent</code> is handled. 
+ * <br><br>
+ * The handling of that events begins with the deserialization of the raw data
+ * byte[] to an associative map. The command is then dereferenced. If the command
+ * is not a "MSG" command then the socket connection and raw data is sent to the
+ * local <code>WaitingRoomWorker</code> thread for processing and handling. 
+ * Otherwise the message is sent to be multiplexed and ultimately echoed back,
+ * by the selector thread, to all the clients connected to the 
+ * <code>ChatRoom</code> to which this worker thread is attached. This worker 
+ * thread will continue processing and handling <code>ChatDataEvents</code> until
+ * this server is shutdown. 
  * 
- * @author Ben
+ * @author Ben Miller
+ * @version 1.0
  */
 public class ChatWorker implements Runnable 
 {
@@ -31,8 +41,7 @@ public class ChatWorker implements Runnable
     public ChatWorker(){}
 
     /* Method to process the message data and enqueue it into the list, so 
-     * that they can be handled by the selector thread (the main thread), 
-     * where it will be written back to user. */
+     * that they can be handled by the selector thread (the main thread). */
     public void processData (ChatRoom ct, SocketChannel sc, byte[] data, int count)
     {
         /* Create a byte array to hold message data.*/

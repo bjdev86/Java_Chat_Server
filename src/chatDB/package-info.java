@@ -36,7 +36,7 @@
  * multiple stages with a predictable outcome, or route for a connection as it 
  * works its way through the server. In this particular server's case the 
  * connection is routed through the "log-in" selector to the "waiting room" 
- * selector and finally to the "chat thread" selector. The selector is ushered 
+ * selector and finally to the "chat thread" selector. The connection is ushered 
  * back to the waiting room selector thread when the client issues the "log-off"
  * command. 
  * <br><br>

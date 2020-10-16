@@ -1,21 +1,25 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package chatDB;
 
 import java.nio.channels.SocketChannel;
 import java.util.Map;
 
 /**
- *
- * @author Ben
+ * Class to define an event object that will contain all the data that is used 
+ * to define a <code>ReceptionEvent</code>. A <code>ReceptionEvent</code> is an 
+ * event that occurs when the reception selector thread sends data to the 
+ * <code>ReceptionWorker</code> for processing. This event will encapsulate a 
+ * new log-in or registration job request. This event's data members include,
+ * The <code>ReceptionRoom</code> selector thread, the socket over which the 
+ * raw data was received by the <code>ReceptionRoom</code>, and the byte[] data
+ * string containing the command and command dependent data. 
+ * 
+ * @author Ben Miller
+ * @version 1.0
  */
 class ReceptionEvent
 {
     // Local Variable Declaration 
-    private RecptionRoom chatServer;
+    private RecptionRoom selectorThread;
     private SocketChannel socket;
     private String command; 
     private Map <String, String> variables;
@@ -23,16 +27,16 @@ class ReceptionEvent
     public ReceptionEvent(RecptionRoom chatServer, SocketChannel sc, String command, 
                          Map<String, String> vars) 
     {
-        this.chatServer = chatServer;
+        this.selectorThread = chatServer;
         this.socket = sc; 
         this.command = command;
         this.variables = vars; 
     }
     
     // Getters 
-    public RecptionRoom getChatServer()
+    public RecptionRoom getSelectorThread()
     {
-        return this.chatServer;
+        return this.selectorThread;
     }
     
     public SocketChannel getSocket()

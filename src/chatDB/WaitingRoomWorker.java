@@ -6,15 +6,24 @@
 package chatDB;
 
 import java.nio.channels.SocketChannel;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
- *
- * @author Ben
+ * Class to define a worker thread used to create and handle 
+ * <code>WaitingRoomEvents</code>. First the raw <code>byte[]</code> is and 
+ * socket connection are added to a queue of <code>WaitingRoomEvents</code> to 
+ * be processed then this thread is interrupted so that the events can be handled.
+ * <br><br>
+ * The handling of <code>WaitingRoomEvents</code> starts off with the 
+ * deserialization of the byte string sent by the client. Next the command is 
+ * dereferenced, matched and then executed. The thread continues to wait for 
+ * <code>WaitingRoomEvent</code>s and processes them until this server is 
+ * shutdown.
+ * 
+ * @author Ben Miller
+ * @version 1.0
  */
 public class WaitingRoomWorker extends Thread 
 {

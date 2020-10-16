@@ -1,17 +1,20 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+
 package chatDB;
 
 import java.nio.channels.SocketChannel;
-import java.util.HashMap;
 import java.util.Map;
 
 /**
- *
- * @author Ben
+ * Class to define an event object containing the data that represents a new 
+ * <code>WaitingRoom</code> job request. This event object contains a handle to 
+ * the WaitingRoom selector thread that spawned this event, the socket over 
+ * which the data for this event was sent and the deserialized associative 
+ * mapping of the data that is connected to this <code>WaitingRoomEvent</code>. 
+ * These events are created by <code>WaitingRoom</code> selector thread and
+ * handled by the <code>WaitingRoomWorker</code> thread.
+ * 
+ * @author Ben Miller
+ * @version 1.0
  */
 class WaitRoomEvent
 {

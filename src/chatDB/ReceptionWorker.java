@@ -1,8 +1,4 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+
 package chatDB;
 
 import java.nio.channels.SocketChannel;
@@ -11,8 +7,18 @@ import java.util.List;
 import java.util.Map;
 
 /**
- *
- * @author Ben
+ * Class to define a worker thread responsible for handling 
+ * <code>ReceptionEvents</code>. This worker receives the raw data and socket
+ * channel from the <code>ReceptionRoom</code> selector thread, creates new
+ * <code>ReceptionEvents</code>, then handles the event. The event is handled by
+ * first deserializing the raw byte string received from the client, next the 
+ * command is dereferenced and executed. The data sent with the command is used
+ * execute any commands referenced. 
+ * <br><br>
+ * The thread operates on an event loop and thus never quits until the server is
+ * shutdown. 
+ * 
+ * @author Ben Miller 
  */
 public class ReceptionWorker extends Thread 
 {
@@ -109,7 +115,7 @@ public class ReceptionWorker extends Thread
 
             /* Send the command back to the command parser to be executed in the 
              * waiting room thread. */
-            this.executeCommand(entEvent.getChatServer(), entEvent.getSocket(),  
+            this.executeCommand(entEvent.getSelectorThread(), entEvent.getSocket(),  
                                 entEvent.getCommand(), entEvent.getVariables());
         }
     }    

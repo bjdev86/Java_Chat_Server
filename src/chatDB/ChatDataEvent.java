@@ -1,15 +1,16 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+
 package chatDB;
 
 import java.nio.channels.SocketChannel;
 
 /**
- * ServerDataEvent class (struct). This allows other threads to get access 
- * to the methods in the ChatServerDB class
+ * Class to define an event object that will contain all the data that is used
+ * to represent a <code>ChatDataEvent</code>. This event includes the following 
+ * data members, a handle to the ChatRoom selector thread that created this 
+ * event; the socket connection over which the data for this event was sent, and
+ * the raw byte[] data string containing the command and command dependent data.
+ * This event is created by the <code>ChatRoom</code> selector thread. This 
+ * event is handled by the <code>ChatWorker</code> worker thread.
  * 
  * @author Ben
  */

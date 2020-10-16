@@ -44,7 +44,7 @@ import java.util.Map;
  * is issued or the client disconnects from this server. Any errors in the
  * registration process will be sent back to the client with an error message.
  * 
- * @author Ben
+ * @author Ben Miller
  * @version 1.0
  * 
  */
