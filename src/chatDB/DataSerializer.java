@@ -1,16 +1,54 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+
 package chatDB;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- *
- * @author Ben
+ * Class to define and enforce a deserialization and by consequence a 
+ * serialization schema used for sending and receiving messages to and from
+ * this server. The class defines constants that are used through out the server
+ * to define what commands are known to the server. Additionally, this class 
+ * defines constants for errors and error messages. Since this class deserializes
+ * command byte strings that are set as a series of key-value pairs the class
+ * defines delimiters between each key-value pair entry and between each key and 
+ * value in the entry. 
+ * <br><br>
+ * The following is a list of all currently available commands. 
+ * <ul>
+ *      <li>LOG_OFF</li>
+ *      <li>LOG_IN</li>
+ *      <li>SGN_UP</li>
+ *      <li>ENTRY_DELIM</li>
+ *      <li>KV_DELIM</li>
+ *      <li>CMD</li>
+ *      <li>UNAME</li>
+ *      <li>PSSWRD</li>
+ *      <li>FNAME</li>
+ *      <li>LNAME</li>
+ *      <li>ERR_MSG</li>
+ *      <li>ERRORED</li>
+ *      <li>CHAT_NAME</li>
+ *      <li>CRT_CHT</li>
+ *      <li>JOIN_CHT</li>
+ *      <li>LEAVE_CHT</li>
+ *      <li>SIGN_OFF</li>
+ * </ul>
+ * 
+ * For example, if a client wanted to issue a sign in command to server they 
+ * would create a data string of the form <code>CMD + KV_DELIM + LOG_IN + 
+ * ENTRY_DELIM + UNAME + KV_DELIM + "usrname" + ENTRY_DELIM + PSSWRD + 
+ * "password" </code>. This data string includes a command, "LOG_IN" and then 
+ * the dependent data needed to execute that command, namely UNAME + KV_DELIM +
+ * "username" + ENTRY_DELIM + PSSWRD + KV_DELIM + "password".
+ * <br><br>
+ * On the server side the <code>deserializeDate</code> method is used to parse
+ * the data string and convert it into a associative map. That map acts as a 
+ * Data Access Object and allows for quick easy retrieval and access to the 
+ * command and the data sent by the client.
+ * 
+ * @author Ben Miller
+ * @version 1.0
  */
 public class DataSerializer 
 {
