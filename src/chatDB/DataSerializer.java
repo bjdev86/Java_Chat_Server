@@ -1,6 +1,7 @@
 
 package chatDB;
 
+import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -52,6 +53,7 @@ import java.util.Map;
  */
 public class DataSerializer 
 {
+    public final static String TEST = "TEST";
     // Entrace worke parsing constatns 
     public final static String LOG_OFF = "LOG_OFF";   
     public final static String LOG_IN  =  "LOG_IN"; 
@@ -89,7 +91,7 @@ public class DataSerializer
         String[] keyVals; 
         
         // Convert the data byte array into a String 
-        String dataString = new String(data).trim();
+        String dataString = new String(data, Charset.forName("UTF-8")).trim();
         
         // Proceed only if the empty string wasn't passed
         if(!dataString.equals(""))

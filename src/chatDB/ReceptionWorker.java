@@ -56,6 +56,8 @@ public class ReceptionWorker extends Thread
          * filtering out data in the buffer from prior reads */
          System.arraycopy(data, 0, filteredReadBuff, 0, count);
          
+        // Parse the byte data out of the frame sent by the client
+        
         // Deserialize the data array passed converting into a map, 'associative array'
         Map <String, String> postData = DataSerializer.deserializeData(filteredReadBuff);
 

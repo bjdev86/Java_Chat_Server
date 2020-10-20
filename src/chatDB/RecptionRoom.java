@@ -17,6 +17,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import websockets.WebSocketWorker;
 
 /**
  * Class to define a selector thread that acts as front door for this chat server.
@@ -47,6 +48,8 @@ import java.util.Map;
  * @author Ben Miller
  * @version 1.0
  * 
+ * @TODO Should the worker thread (or another worker thread) handle connection
+ *       finishing events such as web-socket handshaking?
  */
 public class RecptionRoom implements Runnable
 {
@@ -66,7 +69,7 @@ public class RecptionRoom implements Runnable
     private Selector socSelector; 
 
     // The byte into which message data will be written 
-    private ByteBuffer readBuffer = ByteBuffer.allocate(100); // DIRECT???
+    private ByteBuffer readBuffer = ByteBuffer.allocate(100); // DIRECT???   
    
     /* List of change requests used to flip the interest ops set of theselectable 
      * keys in the selector. */
@@ -82,12 +85,16 @@ public class RecptionRoom implements Runnable
      * (ie login events) */
     private ReceptionWorker doorman = null;
     
+    /* Websocket worker used to handle websockets on this server, this worker
+     * gives this server the ability to use Websockets */ 
+    private WebSocketWorker webSocsWkr = null; 
+    
     // TEMPORIALY USED FOR TESTING!!!!
      private Map <String, String> users = new HashMap<>();
     //--------------------------------------------------------------------------
 
     /**
-     *Public constructor to setup this server's connection components and 
+     * Public constructor to setup this server's connection components and 
      * initialize the selector that will be used to detect socket channel 
      * readiness.
      * 
@@ -202,7 +209,29 @@ public class RecptionRoom implements Runnable
     {
         sc.keyFor(this.socSelector).cancel();
     }
-            
+    
+    /**
+     * 
+     * @param socket
+     * @param command 
+     */
+    public void unsupportedCmd(SocketChannel socket, String command) 
+    {
+        // Local Variable Declaration 
+        String rsp = "";
+        
+        // Build response 
+        rsp = DataSerializer.ERRORED + DataSerializer.ENTRY_DELM + "true"
+            + DataSerializer.ENTRY_DELM + DataSerializer.ERR_MSG  
+            + DataSerializer.ENTRY_DELM + "The command, " + command 
+            + " is not supported.";
+        
+        // Let the client know the command they issued is not supported 
+        this.send(socket, rsp.getBytes());
+    }
+    
+/*----------------------------------------------------------------------------*/
+    
    /* Method to initialize the selector used to keep track of the socket 
     * server channel that will listen for new socket channel connections. 
     * Those new connection channels will be also registered with this 
@@ -235,47 +264,28 @@ public class RecptionRoom implements Runnable
      * setup the new connection channel to be non-blocking and will register it 
      * with the socSelector */
     private void accept (SelectionKey key) throws IOException
-    {
+    {   
         // Get a handle to the server socket channel the key represents
         ServerSocketChannel ssc = (ServerSocketChannel) key.channel(); 
-        //ssc.configureBlocking(false);
         
         // Accept the socket connection and make sure it's non-blocking
         SocketChannel sc = ssc.accept(); // Shouldn't block for long
-
+        
         /* Make the socket channel non-blocking, so that it can participate in 
          * the selector */
         sc.configureBlocking(false);
         
         /* Put the socket channel in the selector, put the selector in the read 
          * position */
-        sc.register(this.socSelector, SelectionKey.OP_READ);
+        SelectionKey client = sc.register(this.socSelector, SelectionKey.OP_CONNECT);
         
-        // Wake up the selector ????
-        //this.socSelector.wakeup();
+        // Let the logger know a new connection was made successfully 
+        System.out.println("Clinet Connected");
+        
+        // Finish the connection, parse and inspect headers, do TCP HandShake
+        this.webSocsWkr.connect(client); // Have the the worker do it!
     }
-
-    /**
-     * 
-     * @param socket
-     * @param command 
-     */
-    public void unsupportedCmd(SocketChannel socket, String command) 
-    {
-        // Local Variable Declaration 
-        String rsp = "";
         
-        // Build response 
-        rsp = DataSerializer.ERRORED + DataSerializer.ENTRY_DELM + "true"
-            + DataSerializer.ENTRY_DELM + DataSerializer.ERR_MSG  
-            + DataSerializer.ENTRY_DELM + "The command, " + command 
-            + " is not supported.";
-        
-        // Let the client know the command they issued is not supported 
-        this.send(socket, rsp.getBytes());
-    }
-    
-    /*------------------------------------------------------------------------*/
     /**
      * 
      * @param sc
@@ -342,8 +352,6 @@ public class RecptionRoom implements Runnable
            /* If an IOException is thrown that means the connectee closed the 
            * connection; therefore, the socketchannel should be closed, and 
            * the key should be canceled */
-           // key.cancel(); 
-           // sc.close();
            clientClosed = true; 
            ioe.printStackTrace();
        }
@@ -435,13 +443,19 @@ public class RecptionRoom implements Runnable
     {
         try
         {
-            // Create an authenticator worker thread 
+            // Create a Websocket worker thread 
+            this.webSocsWkr = new WebSocketWorker(); 
+            
+            // Start the websocket worker running 
+            new Thread(this.webSocsWkr, "Websocket Worker").start();
+            
+            // Create an Entrance worker thread 
             this.doorman = new ReceptionWorker(); 
             
             // Start the authenticator worker 
             new Thread (this.doorman, "EntranceWorker").start();
             
-            // Create a new ChatThread worker 
+            // Create a new WaitingRoom worker 
             this.waitingRoom = new WaitingRoom();
             
             // Start the WaitingRoom thread
@@ -491,6 +505,8 @@ public class RecptionRoom implements Runnable
                                  * is still attached to the selector, to the op 
                                  * that is specified by the ChangeRequest */
                                 key.interestOps( change.getOps() );
+                                
+                                break;
                             }// EndCase
                         }// EndSwitch
                     } // End While loop
@@ -532,7 +548,7 @@ public class RecptionRoom implements Runnable
                         else if (key.isReadable())
                         {
                             // Read from the channel 
-                            this.read(key);
+                            this.read(key);                            
                         }
                         else if (key.isWritable())
                         {

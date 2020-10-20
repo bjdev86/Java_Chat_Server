@@ -34,6 +34,7 @@ public class ChangeRequest
     // Public flags
     public static final int REGISTER = 1; 
     public static final int CHANGEOPS = 2;
+    public static final int HANDSHAKE = 3;
 
     // Private Data Members
     private SocketChannel socket; 
