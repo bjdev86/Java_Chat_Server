@@ -16,7 +16,7 @@ public class HeaderStandards
     private static final  Map <String, List<String>> standards = Map.ofEntries
     (    
         entry("Origin", List.of("http://localhost:4200", "http://localhost")),
-        entry("Host", List.of("127.0.0.1", "localhost")),
+        entry("Host", List.of("127.0.0.1", "localhost", WLD_CRD)),
         entry("GET", List.of("")),
         entry("Connection", List.of("Upgrade")),
         entry("Pragma", List.of("no-cache")),
