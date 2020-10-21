@@ -277,13 +277,13 @@ public class RecptionRoom implements Runnable
         
         /* Put the socket channel in the selector, put the selector in the read 
          * position */
-        SelectionKey client = sc.register(this.socSelector, SelectionKey.OP_CONNECT);
+        SelectionKey clientKey = sc.register(this.socSelector, SelectionKey.OP_CONNECT);
         
         // Let the logger know a new connection was made successfully 
         System.out.println("Clinet Connected");
         
-        // Finish the connection, parse and inspect headers, do TCP HandShake
-        this.webSocsWkr.connect(client); // Have the the worker do it!
+        // Finish the connection, parse and inspect headers, do Websocket HandShake
+        this.webSocsWkr.connect(clientKey, null); // Have the the worker do it!
     }
         
     /**
@@ -367,9 +367,15 @@ public class RecptionRoom implements Runnable
                sc.close();
            }
            else
-           {
-                // Hand off the data to a worker thread for processing
-                this.doorman.processData(this, sc, this.readBuffer.array(), bytesRead);
+           {System.out.println("Frame size: " + bytesRead);              
+                // Hand the frame off to Websocket worker for parsing 
+                this.webSocsWkr.parseFrame(this.readBuffer.array(),key, bytesRead, 
+                    data -> 
+                    {
+                        /* When the frame is processed hand the payload off to 
+                         * the worker thread for further processing */ 
+                        this.doorman.processData(this, sc, data, data.length);
+                    });
            }
        }
    } 
