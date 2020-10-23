@@ -7,7 +7,7 @@ import java.net.Socket;
  *
  * @author Ben
  */
-public class WebSocketAPI extends WebSocketImplementation<Socket>
+public class WebSocketSocketAPI extends AbstractWebSocketAPI<Socket>
 {
 
     @Override
@@ -17,13 +17,13 @@ public class WebSocketAPI extends WebSocketImplementation<Socket>
     }
 
     @Override
-    protected void enFrame(byte[] payload, Socket clientConnection, WebsocketDataHandler onFramed)
+    protected void enFrame(byte[] payload, Socket clientConnection, WebsocketStringDataHandler onFramed)
     {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
     @Override
-    protected void deFrame(byte[] frame, Socket clientConnection, WebsocketDataHandler wdh) throws Exception 
+    protected void deFrame(byte[] frame, Socket clientConnection, WebsocketStringDataHandler stringHandler, WebsocketByteDataHandler byteHandler) throws Exception 
     {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }

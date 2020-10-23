@@ -13,7 +13,8 @@ public class WebSocketEvent
     private SelectionKey clientKey;
     private byte[] frame, payload;
     private String directive = "";
-    private WebsocketDataHandler handler;
+    private WebsocketStringDataHandler stringHandler;
+    private WebsocketByteDataHandler byteHandler;
     
     /**
      * Class constructor to set all of the members of this class all at once
@@ -27,14 +28,15 @@ public class WebSocketEvent
      *        payload ready events.
      * @param clientName The name of the client, used to track the socket.
      */
-    public WebSocketEvent(SelectionKey clientKey, byte[] frame, byte[] payload, 
-                          String dir, WebsocketDataHandler handler) 
+    public WebSocketEvent(SelectionKey clientKey, byte[] frame, byte[] payload,
+        String dir, WebsocketStringDataHandler strHndlr, WebsocketByteDataHandler byteHndlr)
     {
         this.clientKey = clientKey; 
         this.frame = frame;
         this.payload = payload; 
         this.directive = dir; 
-        this.handler = handler;
+        this.stringHandler = strHndlr;
+        this.byteHandler = byteHndlr;
     }
     
     // Getters
@@ -56,8 +58,13 @@ public class WebSocketEvent
     {
         return this.directive;
     }
-    public WebsocketDataHandler getHandler ()
+    public WebsocketStringDataHandler getStringHandler ()
     {
-        return this.handler;
+        return this.stringHandler;
+    }
+
+    WebsocketByteDataHandler getByteHandler() 
+    {
+        return this.byteHandler;
     }
 }

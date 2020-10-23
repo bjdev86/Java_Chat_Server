@@ -28,14 +28,14 @@ public class WebSocketWorker implements Runnable
     private List<WebSocketEvent> queue = new LinkedList<>();
     
     // Handle to WebSocketImpl object which implements the actions taken by this worker
-    private WebSocketChannelAPI websocAPI;
+    private AbstractWebSocketAPI websocAPI;
 /*----------------------------------------------------------------------------*/
     
     // Class Constructor
-    public WebSocketWorker ()
+    public WebSocketWorker (AbstractWebSocketAPI api)
     {
         // Instansiate the web socket implementation for use in this class
-        websocAPI = new WebSocketChannelAPI();
+        this.websocAPI = api;
     }
     
     /**
@@ -44,28 +44,30 @@ public class WebSocketWorker implements Runnable
      * 
      * @param clientKey The key representing the client TCP socket that will be
      *        upgraded to a Websocket.
-     * @param rspHandler
-     * @param clientName
+     * @param onConnection Hanlder invoked when a successful connection is made
      */
-    public void connect (SelectionKey clientKey, WebsocketDataHandler rspHandler)
+    public void connect (SelectionKey clientKey /*WebsocketConnectionHandler onConnection*/)
     {
-        this.createJob(clientKey, null, null, CONCT, rspHandler);
+        this.createJob(clientKey, null, null, CONCT, null, null);
     }
     
     /**
-     * Method to parse an incoming frame from the Websocket. The method takes 
-     * in a lambda expression that handles the parsed payload data from the the
-     * frame 
+     * Method to parse an incoming frame from the Websocket.The method takes 
+ in a lambda expression that handles the parsed payload data from the the
+ frame 
      * 
      * @param frame The frame (byte array) to be parsed (DEFRAMED)
      * @param clientKey The {@code SelectionKey} associated with the socket over 
      *        which this frame was sent.
      * @param frameSize The amount of bytes read in for this frame. 
      *        Frame size in bytes.
-     * @param pyldhandler The handler responsible for processing the data 
+     * @param strHndlr The handler responsible for processing the data 
      *        payload contained in this frame.
+     * @param byteHndlr Hanlder used to deal with bytes parsed from the websocket
+     *        frame.
      */
-    public void parseFrame(byte[] frame, SelectionKey clientKey, int frameSize, WebsocketDataHandler pyldhandler)
+    public void parseFrame(byte[] frame, SelectionKey clientKey, int frameSize, 
+            WebsocketStringDataHandler strHndlr, WebsocketByteDataHandler byteHndlr)
     {
         // Local Variable Declaratin 
         byte trimedFrame[] = new byte[frameSize];
@@ -74,7 +76,7 @@ public class WebSocketWorker implements Runnable
         System.arraycopy(frame, 0, trimedFrame, 0, frameSize);
         
         // Create a websocket event job to handle this frame parse
-        this.createJob(clientKey, trimedFrame, null, DEFRAME, pyldhandler);
+        this.createJob(clientKey, trimedFrame, null, DEFRAME, strHndlr, byteHndlr);
     }
      
     /**
@@ -88,7 +90,8 @@ public class WebSocketWorker implements Runnable
      * @param clientName The name by which this socket will be tracked
      */
     private void createJob(SelectionKey clientKey, byte[] frame, byte[] payload, 
-                 String dir, WebsocketDataHandler handler)
+                 String dir, WebsocketStringDataHandler strHndlr,
+                 WebsocketByteDataHandler byteHndlr)
     {
         /* Create a connection job by creating and adding a WebSocketEvent to 
          * the queue. Create sychronized lock over the queue so that inter-
@@ -96,7 +99,7 @@ public class WebSocketWorker implements Runnable
         synchronized (queue)
         {
             // Add a new ChatDataEvent to the queue 
-            queue.add(new WebSocketEvent (clientKey, frame, payload, dir, handler));
+            queue.add(new WebSocketEvent (clientKey, frame, payload, dir, strHndlr, byteHndlr));
 
             // Notify the queue that there are new events 
             queue.notify();
@@ -144,7 +147,7 @@ public class WebSocketWorker implements Runnable
             /* Parse the command by directive and then execute it */
             this.executeCommand(wbsEvent.getClientKey(), wbsEvent.getFrame(),  
                                 wbsEvent.getPayload(), wbsEvent.getDirective(),
-                                wbsEvent.getHandler());
+                                wbsEvent.getStringHandler(), wbsEvent.getByteHandler());
         }
     }    
     
@@ -158,11 +161,12 @@ public class WebSocketWorker implements Runnable
      * @param directive The action to take regarding the frame
      * @param clientName The name of the client socket over which the frame is 
      *        transmitted
-     * @param handler The handler to either process parsed frame payload data or 
+     * @param strHndlr The handler to either process parsed frame payload data or 
      *        enframed payload data.
      */
     private void executeCommand(SelectionKey clientKey, byte[] frame, 
-        byte[]payload, String directive, WebsocketDataHandler handler) 
+        byte[]payload, String directive, WebsocketStringDataHandler strHndlr,
+        WebsocketByteDataHandler byteHndlr) 
     {
         // Switch the directive string
         switch( directive )
@@ -178,7 +182,7 @@ public class WebSocketWorker implements Runnable
                 try 
                 {
                     // Deframe or parse the frame that came in.
-                    this.websocAPI.deFrame(frame, clientKey, handler);
+                    this.websocAPI.deFrame(frame, clientKey, strHndlr, byteHndlr);
                 } 
                 catch (Exception ex) 
                 {
@@ -192,7 +196,7 @@ public class WebSocketWorker implements Runnable
             case ENFRAME:
             {
                 // Finish the connection 
-                this.websocAPI.enFrame(payload, clientKey, handler);                
+                this.websocAPI.enFrame(payload, clientKey, strHndlr);                
                 break;
             }
             case DSCONCT:
