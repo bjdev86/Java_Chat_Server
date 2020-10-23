@@ -94,7 +94,7 @@ public class DataSerializer
         String dataString = new String(data, Charset.forName("UTF-8")).trim();
         
         // Proceed only if the empty string wasn't passed
-        if(!dataString.equals(""))
+        if(!dataString.equals("")) 
         {        
             // Parse the data string over the expected semicolons
             String[] entries = dataString.split(ENTRY_DELM);
@@ -105,8 +105,13 @@ public class DataSerializer
                 // Parse the entry string over the equals since, spliting key from value
                 keyVals = entry.split(KV_DELM);
 
-                // Put the key-value pair in the associative array 
-                asocArray.put(keyVals[0], keyVals[1]);
+                /* Make sure the directive entry contained a key (command label)
+                 * value (command) pair. If it doesn't the entry is discarded.*/
+                if (keyVals.length == 2)
+                {
+                    // Put the key-value pair in the associative array 
+                    asocArray.put(keyVals[0], keyVals[1]);
+                }
             }
         }
         return asocArray;
