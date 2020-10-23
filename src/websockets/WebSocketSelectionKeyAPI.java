@@ -145,12 +145,12 @@ public class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey
         int dataDex = 0; long total = 0, payloadLength = 0;
         boolean fin = false, rsv1 = false, rsv2 = false, rsv3 = false, mask = false;
         byte aByte = 0x0, opCode = 0x0, maskKeys[] = new byte[4];
+        final BigInteger PYLD_HGH_BIT = new BigInteger("-9223372036854775808", 10);        
+        ArrayList<Object> payload = new ArrayList<>();
         final byte FIN = (byte)128, RSV_1 = (byte)64, RSV_2 = (byte)32, 
                    RSV_3 = (byte)16, OPCODE = (byte)15, MASK = (byte)128, 
                    PYLD_LENGTH = (byte)127;
-        final BigInteger MAX_PYLD_LENGTH = new BigInteger("9223372036854775807", 10);
-        final BigInteger PYLD_HGH_BIT = new BigInteger("-9223372036854775808", 10);        
-        ArrayList<Object> payload = new ArrayList<>();
+        
      
         // Get the first byte
         aByte = frame[dataDex];
@@ -225,7 +225,7 @@ public class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey
             // Check to see if the total contained 0 for the most significant bit
             payloadLength = ((total & PYLD_HGH_BIT.longValueExact()) == 1  ? -1 : total);
         }
-        if (payloadLength < 0 || (payloadLength > MAX_PYLD_LENGTH.longValueExact()))
+        if (payloadLength < 0 || ( payloadLength > Long.MAX_VALUE ))
         {
             /* If the payload length was negative or was greater than the 
              * maximum allowed payload length then throw an exception */
