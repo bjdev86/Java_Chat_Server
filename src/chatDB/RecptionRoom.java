@@ -17,6 +17,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import websockets.WebSocketSelectionKeyAPI;
 import websockets.WebSocketWorker;
 
 /**
@@ -283,7 +284,7 @@ public class RecptionRoom implements Runnable
         System.out.println("Clinet Connected");
         
         // Finish the connection, parse and inspect headers, do Websocket HandShake
-        this.webSocsWkr.connect(clientKey, null); // Have the the worker do it!
+        this.webSocsWkr.connect(clientKey); // Have the the worker do it!
     }
         
     /**
@@ -367,15 +368,15 @@ public class RecptionRoom implements Runnable
                sc.close();
            }
            else
-           {System.out.println("Frame size: " + bytesRead);              
+           {              
                 // Hand the frame off to Websocket worker for parsing 
                 this.webSocsWkr.parseFrame(this.readBuffer.array(),key, bytesRead, 
-                    data -> 
-                    {
+                     (strData) -> 
+                    {System.out.println("String data was: " + new String(strData));
                         /* When the frame is processed hand the payload off to 
                          * the worker thread for further processing */ 
-                        this.doorman.processData(this, sc, data, data.length);
-                    });
+                        this.doorman.processData(this, sc, strData.getBytes(),strData.length());
+                    }, null);
            }
        }
    } 
@@ -450,7 +451,7 @@ public class RecptionRoom implements Runnable
         try
         {
             // Create a Websocket worker thread 
-            this.webSocsWkr = new WebSocketWorker(); 
+            this.webSocsWkr = new WebSocketWorker(new WebSocketSelectionKeyAPI()); 
             
             // Start the websocket worker running 
             new Thread(this.webSocsWkr, "Websocket Worker").start();
