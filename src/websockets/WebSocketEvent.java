@@ -12,9 +12,12 @@ public class WebSocketEvent
  // Local Variable Declaration 
     private SelectionKey clientKey;
     private byte[] frame, payload;
+    private byte opcode;
+    private int frameSize;
     private String directive = "";
     private WebsocketStringDataHandler stringHandler;
     private WebsocketByteDataHandler byteHandler;
+    private WebsocketFramedDataHandler frameHandler;
     
     /**
      * Class constructor to set all of the members of this class all at once
@@ -39,6 +42,21 @@ public class WebSocketEvent
         this.byteHandler = byteHndlr;
     }
     
+    /**
+     *
+     * @param payload
+     * @param opcode
+     * @param frameSize
+     * @param framedHndlr
+     */
+    public WebSocketEvent (byte[] payload, byte opcode, int frameSize, WebsocketFramedDataHandler framedHndlr)
+    {
+        this.payload = payload;
+        this.opcode = opcode; 
+        this.frameSize = frameSize;
+        this.frameHandler = framedHndlr;
+    }
+    
     // Getters
     public SelectionKey getClientKey()
     {
@@ -54,17 +72,34 @@ public class WebSocketEvent
     {
         return this.payload;
     }    
+    
+    public byte getOpcode ()
+    {
+        return this.opcode;
+    }
+    
+    public int getFrameSize ()
+    {
+        return this.frameSize;
+    }
+    
     public String getDirective ()
     {
         return this.directive;
     }
+    
     public WebsocketStringDataHandler getStringHandler ()
     {
         return this.stringHandler;
     }
 
-    WebsocketByteDataHandler getByteHandler() 
+    public WebsocketByteDataHandler getByteHandler() 
     {
         return this.byteHandler;
+    }
+    
+    public WebsocketFramedDataHandler getFramedHandler()
+    {
+        return this.frameHandler;
     }
 }
