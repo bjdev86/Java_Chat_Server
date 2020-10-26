@@ -110,14 +110,13 @@ public class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey
     }
     
    @Override
-    protected void enFrame(byte[] data, byte opcode, int frameDataSize, SelectionKey clientConnection, WebsocketStringDataHandler onFramed) 
+    protected void enFrame(byte[] data, byte opcode, int frameDataSize, WebsocketStringDataHandler onFramed) 
     {
         // Local Variable Declaration 
         byte byte1 = (byte) 0b11111111; byte byte2 = (byte) 0b11111111,
-        frames[][], aframe[]; 
-        int partFrameDataSize = 0, frameCount = 0, aFrameSize = 0, frameDex = 0, 
-            dataDex = 0, pyldByteCount = 0, dataLength = data.length, 
-            thisFrameSize = 0; 
+        frames[][]; 
+        int partFrameDataSize = 0, frameCount = 0, frameDex = 0, dataDex = 0, 
+            pyldByteCount = 0, dataLength = data.length, thisFrameSize = 0; 
         final int BIT_16_PYLD = 65535, BIT_7_PYLD = 125;
         
         /* The frame size must be a valid number that is less than the maximum 
@@ -241,8 +240,15 @@ public class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey
             
             /* Check whether the next frame is the last one or not. If it is 
              * then set the opcode to zero, 'continuation' */
-            byte1 = (byte) ((opcode != 0 && i < frameCount) ? 0b11110000 
-                                                            : 0b11111111);
+            if (opcode != 0b11110000 && i < frameCount)
+            {
+                // Set the opcode 
+                opcode = (byte) 0b11110000;
+                
+                // Set the first byte 
+                byte1 &= opcode;
+                
+            }
             
             // Check to see if the last frame is about to be processed
             if (i == (frameCount - 1))
