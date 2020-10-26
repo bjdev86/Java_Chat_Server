@@ -110,9 +110,150 @@ public class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey
     }
     
    @Override
-    protected void enFrame(byte[] payload, SelectionKey clientConnection, WebsocketStringDataHandler onFramed) 
+    protected void enFrame(byte[] data, byte opcode, int frameDataSize, SelectionKey clientConnection, WebsocketStringDataHandler onFramed) 
     {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        // Local Variable Declaration 
+        byte byte1 = (byte) 0b11111111; byte byte2 = (byte) 0b11111111,
+        frames[][], aframe[]; 
+        int partFrameDataSize = 0, frameCount = 0, aFrameSize = 0, frameDex = 0, 
+            dataDex = 0, pyldByteCount = 0, dataLength = data.length, 
+            thisFrameSize = 0; 
+        final int BIT_16_PYLD = 65535, BIT_7_PYLD = 125;
+        
+        /* The frame size must be a valid number that is less than the maximum 
+         * allowed and greater than -1 if it's not force it into maximum allowed */
+        frameDataSize = frameDataSize <= Integer.MAX_VALUE && frameDataSize > -1 
+                  ? frameDataSize : Integer.MAX_VALUE;
+        
+        /* Calculate the frame count from desired frame size payload byte array 
+         * passed */
+        frameCount = data.length / frameDataSize;
+        
+        // Capture the pay load length of the last partial frame (if any)
+        partFrameDataSize = data.length % frameDataSize; 
+        
+        // Make sure to add in the last potentially partial frame
+        frameCount += partFrameDataSize == 0 ? 0 : 1; 
+        
+        /* Set the fin bit for the first frame in the sequence of frames. Assume
+         * reserved bit flags wont be used for now. */
+        byte1 &= frameCount > 1 ? 0b00001111 : 0b10001111;
+        
+        // Set reserved flag bits
+        
+        // Set the opcode on the last 4 bits 
+        byte1 &= opcode; 
+        
+        // Instansiate the array of frame arrays 
+        frames = new byte[frameCount][0]; 
+      
+        /* If the frame count is only one and partialFrameSize is greater than 0 
+         * then the partialFrameSize should be used to determine the length of 
+         * the frame buffer since there is only enough data for a frame with a 
+         * partial payload. */
+        thisFrameSize = frameCount == 1 && partFrameDataSize > 0 
+                                         ? partFrameDataSize : frameDataSize;
+        // Loop through and build each frame one by one 
+        for (int i = 0; i < frameCount; i++)
+        {
+            // Determine the length code
+            if (thisFrameSize <= BIT_7_PYLD)
+            {
+                /* If the desired frame is less than or equal to the 7 bit 
+                 * payload size then the payload length number will fit into the 
+                 * final 7 bits of the second byte of the frame. Go ahead and 
+                 * create that byte by anding it with the byte stored in the 
+                 * frames array. No additional byte space in the frame will be 
+                 * needed. */
+                //byte2 &= (-128 + frameSize);
+                byte2 &= thisFrameSize;
+            }
+            else if (thisFrameSize <= BIT_16_PYLD)
+            {
+                /* If the desired frame payload length is between 125 and 65535
+                 * then the payload code of 126 will be put in the lower 7 bits
+                 * of the second byte this will indicate to the receiver that 
+                 * the length of the payload is stored in the next 16 bits 
+                 * (2 bytes).*/
+                //byte2 &= 0b11111110;
+                byte2 &= 0b01111110;
+                
+                /* Indicate that the final frame will need space to pack the 
+                 * bytes of this number */
+                pyldByteCount = 2;
+            }
+            else 
+            {
+                /* If the desired payload length is between 2^16 and 2^64 - 1 
+                 * (2^32 - 1 for Java arrays) then payload code, 127 will be 
+                 * stored in the lower 7 bits of the second byte to indicate 
+                 * this. The reciever will know to look in the 64 bits (8 bytes)
+                 * for the unsigned integer indicating the payload length. */
+                //byte2 &= 0b11111111;
+                byte2 &= 0b01111111;
+                
+                /* Indicate that the final frame will need to allocate space to
+                 * pack all 8 bytes in. */
+                pyldByteCount = 8;
+            }
+            
+            // Generate Mask key 
+            
+            // Set the size of the frame 
+            frames[i] = new byte[2 + pyldByteCount + thisFrameSize];
+            
+            /* Pack the first and second bytes, with the fin bit, reserved bits, 
+             * opcode, mask bit and payload length/code */
+            frames[i][frameDex = 0] = byte1; 
+            frames[i][++frameDex] = byte2;
+            
+            // Add the mask key bytes
+            
+            /* The next set of bytes to add to the frame are the bytes that 
+             * comprise payload length. The payload length number could be 1 
+             * byte, 2 bytes, or 8 bytes wide and needs to put in the correct 
+             * order with low byte of the payload length number put in the low 
+             * byte position (last byte) in the frame payload length position. 
+             * Therefore, set the position of the frame index to the position 
+             * where the low byte of the payload length should go unless the 
+             * payload length is 0 meaning the payload length was less than 125.*/
+            frameDex += pyldByteCount; 
+            
+            /* Loop bacwards through current frame adding the bytes of 
+             * the extedended payload length in lowest to highest order to the 
+             * frame array. */
+            for (int j = 0; j < pyldByteCount; j++)
+            {
+                // Set in the frame array
+                frames[i][frameDex - j] = (byte) (dataLength & 255);
+                
+                // Shift the next byte off the length of bytes in the frame 
+                dataLength >>>= 8; 
+            }
+            
+            /* Now the byte data in the array passed can be added to the frame.
+             * Loop through the payload data and copy it over to the frame. This
+             * concludes the forming of one frame. */
+            for (int j = 0; j < thisFrameSize; j++)
+            {
+                frames[i][++frameDex] = data[++dataDex]; 
+            }
+            
+            /* Check whether the next frame is the last one or not. If it is 
+             * then set the opcode to zero, 'continuation' */
+            byte1 = (byte) ((opcode != 0 && i < frameCount) ? 0b11110000 
+                                                            : 0b11111111);
+            
+            // Check to see if the last frame is about to be processed
+            if (i == (frameCount - 1))
+            {
+                // Flip the fin bit  in the first byte 
+                byte1 &= 0b10001111;
+                
+                // Change the size used to determine the frame payload data size 
+                thisFrameSize = partFrameDataSize;
+            }
+        }        
     }
     
     /**
@@ -267,7 +408,6 @@ public class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey
             WebSocketData.PY_LOAD, payload.toArray()
         );
         
-        
         // Process the payload data according to the frame's fin bit and opcode
         if (fin)
         {
@@ -280,6 +420,8 @@ public class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey
                  * complete, get the opcode stored on the socket object for this
                  * connection. Continue processing the gathered message based on
                  * opcode.*/
+                opCode = (byte) this.sockets.get(clientKey)
+                                    .<Object>getProperty(WebSocketData.OPCODE);
             }
             
             // If the opcode is 1 then the payload is expected to be text based
@@ -343,8 +485,9 @@ public class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey
         else
         {
             /* A zero fin bit means that this was not the last frame in the 
-             * data gram. Save the opcode from this the first frame, so that the
-             * other frames are delt with in the same way. */
+             * datagram. Save the opcode from this the first frame, so that the
+             * other frames are delt with in the same way. THIS NEEDS TO BE 
+             * TESTED*/
             this.sockets.get(clientKey).setProperty(WebSocketData.OPCODE, 
                     Byte.toString(opCode));
         }
