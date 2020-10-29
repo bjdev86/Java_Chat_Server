@@ -9,5 +9,5 @@ package websockets;
  */
 public interface WebsocketByteDataHandler
 {
-    public void handleByteData(byte[] data);   
+    public void handleByteData(byte[] data); 
 }
