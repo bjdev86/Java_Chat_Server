@@ -23,8 +23,12 @@ import java.util.stream.Stream;
  *
  * @author Ben
  */
-public class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey>
+public final class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey>
 {
+/*----------------------------------- SINGLETON ------------------------------*/    
+    // The singleton instance of this class 
+    private static final WebSocketSelectionKeyAPI theAPI = new WebSocketSelectionKeyAPI();
+/*---------------------------- PRIVATE DATA MEMBERS --------------------------*/  
     // Private Constants
     private static final String RQS_METHOD  = "RQS_METHOD";
     private static final String RQS_VERSION = "RQS_VERSION";
@@ -39,9 +43,24 @@ public class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey
     
 /*----------------------------------------------------------------------------*/
     
-    // Class Constructor 
-    public WebSocketSelectionKeyAPI (){}
-
+    // Private constructor, only this class will instansiate an instance of this classr 
+    private WebSocketSelectionKeyAPI (){}
+    
+       /**
+     * Method to return the singleton instance created when this class is loaded
+     * into memory. This is the one and only instance of this class that will 
+     * be available to use by any outside class. This means that the data 
+     * encapsulated in this singleton reference will be uniform for the life of
+     * the singleton to which the reference returned points.
+     * 
+     * @return The Singleton reference that points to the singleton held by this
+     *         class, created when the class was loaded into memory
+     */
+    public static WebSocketSelectionKeyAPI getInstance ()
+    {
+        return theAPI;
+    }
+    
     /**
      * Staging method for finishing up a connection that has been accepted by
      * this server.The method parse the headers sent by the client, validate 
@@ -52,7 +71,7 @@ public class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey
      *        to connect to this server.
      */
     @Override
-    public void connect(SelectionKey clientKey)
+    public synchronized void connect(SelectionKey clientKey)
     { 
         // Local Variable Declaration 
         Map<String, String> headers = new HashMap<>(); 
@@ -109,12 +128,31 @@ public class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey
         }
     }
     
-   @Override
-    protected void enFrame(byte[] data, byte opcode, int frameDataSize, WebsocketStringDataHandler onFramed) 
+    /**
+     * Method to encapsulate a byte array into a proper Websocket frame. The 
+     * method allows the data byte array to be broken up into multiple web 
+     * socket frames. Partial frames are saved and tacked on to the end of the 
+     * sequence. The method collects all the frames created in a 2D array of 
+     * bytes with the first frame stored at {@code frames[0]}. The passed handler
+     * is called to process the frames once they've been created. 
+     * 
+     * @param data The byte array to enframe. This array may be broken up into 
+     *        multiple frames
+     * @param opcode Determines what type of data the frame(s) should be 
+     *        interpreted as by the receiver. 1 for text (string) and 2 for 
+     *        binary data. Defaults to 1 if > 2. 
+     * @param frameDataSize The size of an individual frame. This size must be 
+     *        between 0 and 2^31 - 1 (since Java uses 32 bit signed integers).
+     *        This value will default to 2^31 - 1 (Integer.MAX_VALUE). 
+     * @param framesHndlr Lambda called with frames created. This lambda is 
+     *        expected to handle frames once they have been created. 
+     */
+    @Override
+    public synchronized void frame(byte[] data, byte opcode, int frameDataSize, WebsocketFramedDataHandler framesHndlr) 
     {
         // Local Variable Declaration 
         byte byte1 = (byte) 0b11111111; byte byte2 = (byte) 0b11111111,
-        frames[][]; 
+        frames[][], mask[] = new byte[4]; 
         int partFrameDataSize = 0, frameCount = 0, frameDex = 0, dataDex = 0, 
             pyldByteCount = 0, dataLength = data.length, thisFrameSize = 0; 
         final int BIT_16_PYLD = 65535, BIT_7_PYLD = 125;
@@ -134,15 +172,15 @@ public class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey
         // Make sure to add in the last potentially partial frame
         frameCount += partFrameDataSize == 0 ? 0 : 1; 
         
+        // Set the opcode on the last 4 bits 
+        byte1 &= opcode > 2 ? 1 : opcode; 
+        
         /* Set the fin bit for the first frame in the sequence of frames. Assume
          * reserved bit flags wont be used for now. */
-        byte1 &= frameCount > 1 ? 0b00001111 : 0b10001111;
+        byte1 ^= frameCount > 1 ? 0b00000000 : 0b10000000;
         
         // Set reserved flag bits
-        
-        // Set the opcode on the last 4 bits 
-        byte1 &= opcode; 
-        
+                
         // Instansiate the array of frame arrays 
         frames = new byte[frameCount][0]; 
       
@@ -161,11 +199,13 @@ public class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey
                 /* If the desired frame is less than or equal to the 7 bit 
                  * payload size then the payload length number will fit into the 
                  * final 7 bits of the second byte of the frame. Go ahead and 
-                 * create that byte by anding it with the byte stored in the 
-                 * frames array. No additional byte space in the frame will be 
-                 * needed. */
-                //byte2 &= (-128 + frameSize);
-                byte2 &= thisFrameSize;
+                 * create that byte by anding the desired frame size with -128 
+                 * (0b10000000), this will manipulate the lower 7 bits of the 
+                 * byte, while leaving the top bit as 1. The top bit is the mask
+                 * bit, which will tell the reciever we're sending this frame 
+                 * with a masked payload. No additional byte space in the frame 
+                 * will be needed. */
+                byte2 &= (-128 + thisFrameSize);                
             }
             else if (thisFrameSize <= BIT_16_PYLD)
             {
@@ -174,8 +214,8 @@ public class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey
                  * of the second byte this will indicate to the receiver that 
                  * the length of the payload is stored in the next 16 bits 
                  * (2 bytes).*/
-                //byte2 &= 0b11111110;
-                byte2 &= 0b01111110;
+                byte2 &= 0b11111110;
+                //byte2 &= 0b01111110;
                 
                 /* Indicate that the final frame will need space to pack the 
                  * bytes of this number */
@@ -184,29 +224,31 @@ public class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey
             else 
             {
                 /* If the desired payload length is between 2^16 and 2^64 - 1 
-                 * (2^32 - 1 for Java arrays) then payload code, 127 will be 
+                 * (2^32 - 1 for Java arrays) then payload code 127 will be 
                  * stored in the lower 7 bits of the second byte to indicate 
                  * this. The reciever will know to look in the 64 bits (8 bytes)
                  * for the unsigned integer indicating the payload length. */
-                //byte2 &= 0b11111111;
-                byte2 &= 0b01111111;
+                byte2 &= 0b11111111;
+                //byte2 &= 0b01111111;
                 
                 /* Indicate that the final frame will need to allocate space to
                  * pack all 8 bytes in. */
                 pyldByteCount = 8;
             }
             
-            // Generate Mask key 
-            
             // Set the size of the frame 
-            frames[i] = new byte[2 + pyldByteCount + thisFrameSize];
+            frames[i] = new byte[2 + pyldByteCount + mask.length + thisFrameSize];
             
             /* Pack the first and second bytes, with the fin bit, reserved bits, 
              * opcode, mask bit and payload length/code */
-            frames[i][frameDex = 0] = byte1; 
-            frames[i][++frameDex] = byte2;
-            
-            // Add the mask key bytes
+            frames[i][frameDex = 0] = byte1; // Restart the frame index
+            frames[i][++frameDex]   = byte2;
+           
+            // Generate Mask key 
+            mask[0] = 50; 
+            mask[1] = 123;
+            mask[2] = 100;
+            mask[3] = 36;
             
             /* The next set of bytes to add to the frame are the bytes that 
              * comprise payload length. The payload length number could be 1 
@@ -223,11 +265,17 @@ public class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey
              * frame array. */
             for (int j = 0; j < pyldByteCount; j++)
             {
-                // Set in the frame array
-                frames[i][frameDex - j] = (byte) (dataLength & 255);
+                // Set in the frame array (255 = 0b11111111)
+                frames[i][frameDex - j] = (byte) (dataLength & 255); 
                 
                 // Shift the next byte off the length of bytes in the frame 
                 dataLength >>>= 8; 
+            }
+            
+            /* Pack each byte of the mask key into the frame */
+            for (byte key : mask)
+            {
+                frames[i][++frameDex] = key;
             }
             
             /* Now the byte data in the array passed can be added to the frame.
@@ -235,31 +283,30 @@ public class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey
              * concludes the forming of one frame. */
             for (int j = 0; j < thisFrameSize; j++)
             {
-                frames[i][++frameDex] = data[++dataDex]; 
+                frames[i][++frameDex] = (byte) ((data[dataDex++] ^ mask[j % 4])); 
             }
             
             /* Check whether the next frame is the last one or not. If it is 
              * then set the opcode to zero, 'continuation' */
-            if (opcode != 0b11110000 && i < frameCount)
+            if ((opcode != 0b00000000) && (i < frameCount))
             {
-                // Set the opcode 
-                opcode = (byte) 0b11110000;
-                
-                // Set the first byte 
-                byte1 &= opcode;
-                
+                // Set the bottom nibble of the first byte 
+                byte1 &= 0b11110000;   
             }
             
             // Check to see if the last frame is about to be processed
             if (i == (frameCount - 1))
             {
-                // Flip the fin bit  in the first byte 
-                byte1 &= 0b10001111;
+                // Flip the fin bit in the first byte, preserving all other bits 
+                byte1 &= 0b11111111;
                 
                 // Change the size used to determine the frame payload data size 
                 thisFrameSize = partFrameDataSize;
             }
-        }        
+        }
+
+        // Invoke the call back to pass the framed byte arrays back 
+        framesHndlr.onFramed(frames);
     }
     
     /**
@@ -285,20 +332,23 @@ public class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey
      *       thrown or should just nothing happen? Right now nothing happens
      */
     @Override
-    public void deFrame( byte[] frame, SelectionKey clientKey, 
+    public synchronized void unFrame( byte[] frame, SelectionKey clientKey, 
        WebsocketStringDataHandler strHndlr, WebsocketByteDataHandler byteHndlr ) throws Exception
     {
         // Local Variable Declaration 
         int dataDex = 0; long total = 0, payloadLength = 0;
+        
         boolean fin = false, rsv1 = false, rsv2 = false, rsv3 = false, mask = false;
+        
         byte aByte = 0x0, opCode = 0x0, maskKeys[] = new byte[4];
-        final BigInteger PYLD_HGH_BIT = new BigInteger("-9223372036854775808", 10);        
+        
         ArrayList<Object> payload = new ArrayList<>();
+        
+        final BigInteger PYLD_HGH_BIT = new BigInteger("-9223372036854775808", 10);        
         final byte FIN = (byte)128, RSV_1 = (byte)64, RSV_2 = (byte)32, 
                    RSV_3 = (byte)16, OPCODE = (byte)15, MASK = (byte)128, 
                    PYLD_LENGTH = (byte)127;
         
-     
         // Get the first byte
         aByte = frame[dataDex];
         
@@ -488,26 +538,22 @@ public class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey
                 System.out.println("We got a pong frame");
             }
         }
-        else
+        else if (opCode != 0)
         {
             /* A zero fin bit means that this was not the last frame in the 
-             * datagram. Save the opcode from this the first frame, so that the
-             * other frames are delt with in the same way. THIS NEEDS TO BE 
-             * TESTED*/
+             * frame sequence. Save the opcode from the first frame, so 
+             * that the other frames are delt with in the same way. Filter out 
+             * any zero opCodes, so that the saved opcode is not overwritten. 
+             * THIS NEEDS TO BE TESTED. */
             this.sockets.get(clientKey).setProperty(WebSocketData.OPCODE, 
                     Byte.toString(opCode));
         }
     }   
-
-    @Override
-    public void unsupportedDirective(SelectionKey clientKey, String directive)
-    {
-        
-    }
     
-/*----------------------------------------------------------------------------*/
+/*------------------------------ PRIVATE METHODS -----------------------------*/
     /**
-     * Method to read in the raw headers from the socket client. 
+     * Method to read in the raw HTTP headers from the socket client during the
+     * initial connection process.  
      * 
      * @param clientKey The key representing the client connection in this 
      *        selector thread's selector.
@@ -666,14 +712,6 @@ public class WebSocketSelectionKeyAPI extends AbstractWebSocketAPI <SelectionKey
 
             // Write the response header back to the connection client. That's it!
             sc.write(ByteBuffer.wrap(rsp));
-         
-            /* That's it!!! The response has been sent and the connection is 
-             * established change the interest op set of the connection to read
-             * so that data frames can be recieved.*/
-            clientKey.interestOps(SelectionKey.OP_READ);
-            
-            // Wake up the selector, so that the connection can be do I/O 
-            clientKey.selector().wakeup();
         } 
         catch (IOException ex) 
         {            
