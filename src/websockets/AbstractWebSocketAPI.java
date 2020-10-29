@@ -18,8 +18,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public abstract class AbstractWebSocketAPI<T> 
 {
 /*-------------------------- Protected Data Members --------------------------*/
-    // Map to track sockets that connect to this server 
-    protected  Map<T, WebSocketData> sockets = new ConcurrentHashMap<>();
+    /**
+     * Map to track sockets that connect to this server 
+     */
+    protected volatile Map<T, WebSocketData> sockets = new ConcurrentHashMap<>();
     
     // Handshake header string 
     protected final String HND_SHK_HDR =
@@ -31,20 +33,25 @@ public abstract class AbstractWebSocketAPI<T>
     // Bad Request Header 
     protected final String BAD_RQST_HDR =
             "HTTP/1.1 400 Bad Request\r\n"
-            + "Descrition: ";
+            + "Description: ";
     
     // Magic string used to decode the Web-Socket key sent by the connecting client
-    protected String magicString = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+    protected final String magicString = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 /*----------------------------------------------------------------------------*/    
     // Abstract Methods
-    protected abstract void connect(T clientConnection);
-    protected abstract void enFrame(byte[] payload, T clientConnection, 
-                                    WebsocketStringDataHandler onFramed );
-    protected abstract void deFrame(byte[] frame, T clientConnection,
+    public abstract void connect(T clientConnection);
+    public abstract void frame(byte[] data, byte opcode, int frameDataSize, 
+                                          WebsocketFramedDataHandler onFramed );
+    
+    public abstract void unFrame(byte[] frame, T clientConnection,
                                     WebsocketStringDataHandler strHandlr, 
-                                    WebsocketByteDataHandler byteHandlr ) 
-        throws Exception;
-    protected abstract void unsupportedDirective(T clientConnection, String directive);
+                                    WebsocketByteDataHandler byteHandlr )
+                                    throws Exception;
+//    public abstract void unsupportedDirective(T clientConnection, String directive);
+    
+    public void sendPing(){}
+    public void disconnect(){}
+    public void setClosingListener(WebsocketClosingHandler clsHndlr) {}
 /*----------------------------------------------------------------------------*/
-   
+    
 }
