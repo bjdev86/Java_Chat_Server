@@ -18,7 +18,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import websockets.WebSocketSelectionKeyAPI;
-import websockets.WebSocketWorker;
 
 /**
  * Class to define a selector thread that acts as front door for this chat server.
@@ -78,17 +77,18 @@ public class RecptionRoom implements Runnable
     
    // Map of a socket channel to a list of all  ByteBuffers to be written 
    private Map <SocketChannel, List <ByteBuffer>> pendingData = new HashMap <>();
-    /* The chat thread that will multiplex multiple socket channels for a text 
-     * conversation */
+    
+    /* The selector thread to hold multiple socket channels until they enter a
+     * chat thread.*/
     private WaitingRoom waitingRoom = null;
     
     /* ReceptionWorker thread to handle client credential authentication 
      * (ie login events) */
     private ReceptionWorker doorman = null;
     
-    /* Websocket worker used to handle websockets on this server, this worker
-     * gives this server the ability to use Websockets */ 
-    private WebSocketWorker webSocsWkr = null; 
+    /* Websocket plugin used to handle websockets on this server, this API
+     * gives this server the ability to use Websockets */
+    private WebSocketSelectionKeyAPI webSocs;
     
     // TEMPORIALY USED FOR TESTING!!!!
      private Map <String, String> users = new HashMap<>();
@@ -107,9 +107,13 @@ public class RecptionRoom implements Runnable
     public RecptionRoom (String hostAddress, int port) throws IOException
     {
         this.users.put("admin", "password"); //TEST USERS
+        
         // Set the host and port from the parameters passed 
         this.hostAddress = new InetSocketAddress(hostAddress, port);
 
+        // Get the singleton reference to websocket plug-in
+        this.webSocs = WebSocketSelectionKeyAPI.getInstance();
+        
         // Proceed to initialize the selector 
         this.socSelector = this.initSelector();
     }
@@ -193,16 +197,15 @@ public class RecptionRoom implements Runnable
         
         // Build response string 
         rsp = DataSerializer.ERRORED + "=" + "false";
-        
+      
         // Return success code to client
         this.send(sc, rsp.getBytes());
     }
     
-    /* Method to remove a socket channel from the selector used by this 
-     * SelectorThread */
-
     /**
-     *
+     * Method to remove a socket channel from the selector used by this 
+     * selector thread
+     * 
      * @param sc
      */
 
@@ -272,6 +275,7 @@ public class RecptionRoom implements Runnable
         // Accept the socket connection and make sure it's non-blocking
         SocketChannel sc = ssc.accept(); // Shouldn't block for long
         
+        
         /* Make the socket channel non-blocking, so that it can participate in 
          * the selector */
         sc.configureBlocking(false);
@@ -284,7 +288,15 @@ public class RecptionRoom implements Runnable
         System.out.println("Clinet Connected");
         
         // Finish the connection, parse and inspect headers, do Websocket HandShake
-        this.webSocsWkr.connect(clientKey); // Have the the worker do it!
+        this.webSocs.connect(clientKey);
+        
+        /* That's it!!! The response has been sent and the connection is 
+         * established change the interest op set of the connection to read
+         * so that data frames can be recieved.*/
+        clientKey.interestOps(SelectionKey.OP_READ);
+        
+        // Wake up the selector, so that the connection can be do I/O 
+        this.socSelector.wakeup();
     }
         
     /**
@@ -294,41 +306,50 @@ public class RecptionRoom implements Runnable
      */
     public void send (SocketChannel sc, byte[] data)
     {
+        
+        // Frame up the data into web socket frames before sending to the client
+        this.webSocs.frame(data, (byte) 1, 100, (frames) ->
+        {        
         /* Get a lock from the changeRequests List object, so that any thread  
-          * that accesses the list will have to wait until a current thread is 
-          * done accessing the list */
-         synchronized( this.changeRequests ) 
-         {
-             // Indicate we want the interest ops set changed
-             this.changeRequests.add(new ChangeRequest(sc, ChangeRequest.CHANGEOPS, SelectionKey.OP_WRITE));
-            
-             // And queue the data we want written
-             synchronized (this.pendingData) 
-             {
-                 /* Get the queue of byte buffers that are associated with the 
-                  * socket channel passed, the socket channel to be used to send 
-                  * the byte buffer to the client */   
+         * that accesses the list will have to wait until a current thread is 
+         * done accessing the list */
+        synchronized( this.changeRequests ) 
+        {
+            // Indicate we want the interest ops set changed
+            this.changeRequests.add(new ChangeRequest(sc, ChangeRequest.CHANGEOPS, SelectionKey.OP_WRITE));
+
+            // And queue the data we want written
+            synchronized (this.pendingData) 
+            {
+                /* Get the queue of byte buffers that are associated with the 
+                 * socket channel passed, the socket channel to be used to send 
+                 * the byte buffer to the client */   
                  List<ByteBuffer> queue = (List<ByteBuffer>) this.pendingData.get(sc);
 
-                 // Make sure the quere returned from the Map exsisted
-                 if (queue == null) 
-                 {
-                     // If the queue is null then create an empty ArrayList queue
-                     queue = new ArrayList<ByteBuffer>();
+                // Make sure the queue returned from the Map exsisted
+               if (queue == null) 
+               {
+                    // If the queue is null then create an empty ArrayList queue
+                    queue = new ArrayList<ByteBuffer>();
 
-                     /* Map the passed socket to the newly created queue of byte 
-                      * buffers */
-                     this.pendingData.put(sc, queue);
-                 }
-
-                 /* Add the data that is to be sent back to the client to the 
-                  * queue */
-                 queue.add(ByteBuffer.wrap(data));
-             }
-           }
+                    /* Map the passed socket to the newly created queue of byte 
+                     * buffers */
+                    this.pendingData.put(sc, queue);
+               }
+              
+               // Loop through all the frames and add each one to be sent 
+               for (byte[] frame : frames)
+               {
+                   /* Add the data that is to be sent back to the client to the 
+                    * queue */
+                   queue.add(ByteBuffer.wrap(frame));
+               }
+            }
+        }
+        });
         
-           // Finally, wake up our selecting thread so it can make the required changes
-           this.socSelector.wakeup();
+        // Finally, wake up our selecting thread so it can make the required changes
+        this.socSelector.wakeup();
     }
    
    /* Method to read data from a socket channel that is sent to this server. */
@@ -336,7 +357,8 @@ public class RecptionRoom implements Runnable
    {
        // Local Variable Declaration 
        int bytesRead = 0; boolean clientClosed = false; 
-
+       byte trimedBuff[]; 
+       
        // Get a local handle on the channel so it can be read 
        SocketChannel sc = (SocketChannel) key.channel();
 
@@ -368,15 +390,30 @@ public class RecptionRoom implements Runnable
                sc.close();
            }
            else
-           {              
-                // Hand the frame off to Websocket worker for parsing 
-                this.webSocsWkr.parseFrame(this.readBuffer.array(),key, bytesRead, 
-                     (strData) -> 
+           { 
+                // Instansiate the trimed buffer array based on the bytes read 
+                trimedBuff = new byte[bytesRead];
+                
+                // Trim the array from the buffer just read into 
+                System.arraycopy(this.readBuffer.array(), 0, trimedBuff, 0, bytesRead);
+                
+                try
+                {
+                 // Hand the frame off to Websocket worker for parsing 
+                 this.webSocs.unFrame(trimedBuff, key,(strData) -> 
                     {System.out.println("String data was: " + new String(strData));
                         /* When the frame is processed hand the payload off to 
                          * the worker thread for further processing */ 
                         this.doorman.processData(this, sc, strData.getBytes(),strData.length());
                     }, null);
+                }
+                catch (Exception ex)
+                {
+                    // Fatal errors occured shut down the connection 
+                    //this.webSocs.disconnect();
+                    key.cancel();
+                    sc.close();
+                }
            }
        }
    } 
@@ -449,17 +486,11 @@ public class RecptionRoom implements Runnable
     public void run() 
     {
         try
-        {
-            // Create a Websocket worker thread 
-            this.webSocsWkr = new WebSocketWorker(new WebSocketSelectionKeyAPI()); 
-            
-            // Start the websocket worker running 
-            new Thread(this.webSocsWkr, "Websocket Worker").start();
-            
+        {            
             // Create an Entrance worker thread 
             this.doorman = new ReceptionWorker(); 
             
-            // Start the authenticator worker 
+            // Start the entrance worker 
             new Thread (this.doorman, "EntranceWorker").start();
             
             // Create a new WaitingRoom worker 
@@ -580,7 +611,7 @@ public class RecptionRoom implements Runnable
      * @param args
      */
     public static void main(String[] args) 
-    {
+    { 
         try 
         {
             // Start the server as new thread listening at localhost:90
